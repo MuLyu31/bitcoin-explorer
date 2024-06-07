@@ -56,7 +56,7 @@ Created schema by `\d`, should look like this:
 
 > You have to run the `bitcoin` first to get the folder above created
 
-`brew services start bitcoin`
+`brew services start bitcoin` (suppose you use MacOS and homebrew)
 
 type below into
 ````

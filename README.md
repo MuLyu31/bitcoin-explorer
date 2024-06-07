@@ -54,6 +54,10 @@ Created schema by `\d`, should look like this:
 
 `nano ~/Library/Application\ Support/Bitcoin/bitcoin.conf`
 
+> You have to run the `bitcoin` first to get the folder above created
+
+`brew services start bitcoin`
+
 type below into
 ````
 server=1

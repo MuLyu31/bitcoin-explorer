@@ -1,0 +1,11 @@
+[package]
+name = "rust_client_adapter"
+version = "0.1.0"
+edition = "2018"
+
+
+[dependencies]
+bitcoincore-rpc = "0.19.0"
+tokio = { version = "1", features = ["full"] }
+tokio-postgres = "0.7"
+bitcoin = "0.29.0"

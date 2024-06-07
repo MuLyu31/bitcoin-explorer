@@ -6,12 +6,11 @@ use bitcoincore_rpc::bitcoin::Transaction as RpcTransaction;
 #[tokio::main]
 async fn main() {
     // Connect to the Bitcoin Core node
-    let rpc = Client::new("http://127.0.0.1:8332", Auth::UserPass("user".to_string(), "password".to_string())).unwrap();
-
+    let rpc = Client::new("http://127.0.0.1:8332", Auth::UserPass("myrpcuser".to_string(), "myrpcpassword".to_string())).unwrap();
     // Set up PostgreSQL connection
     let (client, _connection) = Config::new()
-        .user("your_postgres_username")
-        .password("your_postgres_password")
+        .user("postgres")
+        .password("1234")
         .host("localhost")
         .port(5432)
         .dbname("bitcoin_explorer")

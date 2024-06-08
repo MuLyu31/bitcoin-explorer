@@ -1,13 +1,18 @@
-use bitcoincore_rpc::{Auth, Client, RpcApi};
-use tokio_postgres::{Config, NoTls};
-use std::convert::TryInto;
 use bitcoincore_rpc::bitcoin::Transaction as RpcTransaction;
+use bitcoincore_rpc::{Auth, Client, RpcApi};
+use std::convert::TryInto;
+use tokio_postgres::{Config, NoTls};
 
 #[tokio::main]
 async fn main() {
     // Connect to the Bitcoin Core node
-    let rpc = Client::new("http://127.0.0.1:8332", Auth::UserPass("myrpcuser".to_string(), "myrpcpassword".to_string())).unwrap();
+    let rpc = Client::new(
+        "http://127.0.0.1:8332",
+        Auth::UserPass("myrpcuser".to_string(), "myrpcpassword".to_string()),
+    )
+    .unwrap();
     // Set up PostgreSQL connection
+    // The underscore prefix indicates that while you need to keep the connection object around to maintain the connection to PostgreSQL, you don’t plan to use it directly in your code.
     let (client, _connection) = Config::new()
         .user("postgres")
         .password("1234")
@@ -44,7 +49,9 @@ async fn main() {
 
         // Fetch transactions for each new block
         for block_height in (latest_block_height + 1)..=current_block_height {
-            let block_hash = rpc.get_block_hash(block_height.try_into().unwrap()).unwrap();
+            let block_hash = rpc
+                .get_block_hash(block_height.try_into().unwrap())
+                .unwrap();
             let block = rpc.get_block(&block_hash).unwrap();
 
             // Process transactions in the block
@@ -73,8 +80,12 @@ async fn calculate_transaction_fee(tx: &RpcTransaction) -> i64 {
     // Calculate transaction fee (dummy implementation)
     // In a real implementation, you need to fetch the previous transactions to get the input values
     let input_value: i64 = 0; // Replace with actual calculation
-    let output_value: i64 = tx.output.iter().map(|output| output.value.to_sat() as i64).sum();
-    
+    let output_value: i64 = tx
+        .output
+        .iter()
+        .map(|output| output.value.to_sat() as i64)
+        .sum();
+
     input_value - output_value
 }
 
@@ -94,14 +105,20 @@ async fn insert_transaction_into_database(client: &tokio_postgres::Client, txid:
 async fn get_latest_block_height_from_database(client: &tokio_postgres::Client) -> i32 {
     // Fetch and return the latest processed block height from the database
     let row = client
-        .query_one("SELECT COALESCE(MAX(block_height), 0) FROM transactions", &[])
+        .query_one(
+            "SELECT COALESCE(MAX(block_height), 0) FROM transactions",
+            &[],
+        )
         .await
         .expect("Failed to fetch latest block height from database");
 
     row.get::<usize, i32>(0)
 }
 
-async fn update_latest_block_height_in_database(client: &tokio_postgres::Client, block_height: i32) {
+async fn update_latest_block_height_in_database(
+    client: &tokio_postgres::Client,
+    block_height: i32,
+) {
     // Update the latest processed block height in the database
     if let Err(e) = client
         .execute(

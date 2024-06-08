@@ -24,6 +24,16 @@ async fn main() {
             eprintln!("PostgreSQL connection error: {}", e);
         }
     });
+    // Update height
+    // let get_height = warp::path("height")
+    //     .and(warp::post())
+    //     .and_then(move || {
+    //         let db_client = db_client.clone();
+    //         async move {
+    //             let latest_block_height = get_latest_block_height_from_database(&db_client).await;
+    //             Ok::<_, warp::Rejection>(warp::reply::json(&latest_block_height))
+    //         }
+    //     });
 
     // Get the latest block height processed
     let latest_block_height = get_latest_block_height_from_database(&client).await;

@@ -95,8 +95,8 @@ async fn update_latest_block_height_in_database(client: &tokio_postgres::Client,
     // Update the latest processed block height in the database
     if let Err(e) = client
         .execute(
-            "INSERT INTO transactions (block_height) VALUES ($1) ON CONFLICT DO NOTHING",
-            &[&block_height],
+            "INSERT INTO latest_block_height (id, block_height) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET block_height = EXCLUDED.block_height",
+            &[&block_threshold],
         )
         .await
     {

@@ -72,6 +72,7 @@ async fn main() {
 
         // Continuously fetch new blocks and transactions
         loop {
+            //TODO: latest 20 blocks;
             let current_block_height = rpc_clone.get_block_count().unwrap() as i32;
 
             // Fetch transactions for each new block

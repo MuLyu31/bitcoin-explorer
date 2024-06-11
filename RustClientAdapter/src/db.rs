@@ -2,6 +2,7 @@ use tokio_postgres::{Client, Config, NoTls};
 use std::sync::Arc;
 use std::env;
 use dotenv::dotenv;
+use log::{info, error};
 
 // Wrap the tokio_postgres::Client in an Arc to make it thread-safe.
 pub type DbClient = Arc<Client>;
@@ -56,10 +57,8 @@ pub async fn connect_to_postgres(db_config: &DatabaseConfig) -> DbClient {
 
 pub async fn insert_transaction(client: &DbClient, txid: &str, block_height: i32, table_name: &str) {
     let query = format!("INSERT INTO {} (txid, block_height) VALUES ($1, $2)", table_name);
-    if let Err(e) = client
-        .execute(&query, &[&txid, &block_height])
-        .await
-    {
-        eprintln!("Failed to insert transaction into database: {}", e);
+    match  client.execute(&query, &[&txid, &block_height]).await{
+        Ok(_) => info!("Inserted block height {}", block_height),
+        Err(e) => error!("Failed to insert transaction: {}", e),
     }
 }

@@ -59,9 +59,11 @@ async fn process_latest_blocks(rpc: RpcClient, db: Arc<tokio_postgres::Client>, 
             }
         };
 
-        for tx in block.txdata.iter() {
-            process_transaction(&db, tx, block_height, table_name).await;
-        }
+        // Do not need to record each transaction in the block.
+        // for tx in block.txdata.iter() {
+        //     process_transaction(&db, tx, block_height, table_name).await;
+        // }
+        insert_transaction(&db, &block.txdata[0].compute_txid().to_string(), block_height, table_name).await;
     }
 }
 

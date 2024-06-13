@@ -92,14 +92,13 @@ async fn get_latest_block_height_from_database(client: &tokio_postgres::Client) 
 }
 
 async fn update_latest_block_height_in_database(client: &tokio_postgres::Client, block_height: i32) {
-    // Update the latest processed block height in the database
-    if let Err(e) = client
-        .execute(
-            "INSERT INTO transactions (block_height) VALUES ($1) ON CONFLICT DO NOTHING",
-            &[&block_height],
-        )
-        .await
-    {
-        eprintln!("Failed to update latest block height in database: {}", e);
+    // This function attempts to insert the latest block height into the 'transactions' table.
+    // If a conflict arises (e.g., a duplicate entry), the operation is aborted and does nothing.
+    let query = "INSERT INTO transactions (block_height) VALUES ($1) ON CONFLICT DO NOTHING";
+    let params = &[&block_height];
+
+    match client.execute(query, params).await {
+        Ok(_) => println!("Block height updated successfully."),
+        Err(e) => eprintln!("Failed to update latest block height in database: {}", e),
     }
 }

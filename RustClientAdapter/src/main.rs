@@ -148,6 +148,7 @@ async fn get_latest_block_height_from_database(client: &tokio_postgres::Client) 
     row.get::<usize, i32>(0)
 }
 
+
 async fn update_latest_block_height_in_database(
     client: &tokio_postgres::Client,
     block_height: i32,

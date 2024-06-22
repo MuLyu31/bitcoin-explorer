@@ -1,5 +1,6 @@
 mod bitcoin_rpc;
 mod db;
+mod server;
 
 use db::{connect_to_postgres, insert_transaction, DatabaseConfig};
 use bitcoin_rpc::{get_block_count, get_block_hash, get_block, connect_to_bitcoin_rpc, RpcClient, RpcTransaction};
@@ -21,8 +22,15 @@ async fn main() {
 
     // Connect to PostgreSQL.
     let db = connect_to_postgres(&db_config).await;
+    // Clone the database connection to pass to the server 
+    let db_clone = db.clone();
 
     let table_name = "transactions";
+
+    // Start the server in a separate task.
+    tokio::spawn(async move {
+        server::start_server(db_clone).await;
+    });
 
     loop {
         process_latest_blocks(rpc.clone(), db.clone(), table_name).await;

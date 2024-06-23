@@ -1,165 +1,131 @@
-use bitcoincore_rpc::bitcoin::Transaction as RpcTransaction;
-use bitcoincore_rpc::{Auth, Client, RpcApi};
-use std::convert::TryInto;
+mod bitcoin_rpc;
+mod db;
+mod server;
+
+use bitcoin_rpc::{
+    connect_to_bitcoin_rpc, get_block, get_block_count, get_block_hash, get_difficulty,
+    get_connection_count, RpcClient, RpcTransaction,
+};
+use db::{connect_to_postgres, insert_transaction, DatabaseConfig};
+use dotenv::dotenv;
+use log::{error, info};
 use std::sync::Arc;
-use tokio_postgres::{Config, NoTls};
-use warp::{Filter, Reply};
-use warp::http::StatusCode;
-use warp::cors;
-use std::convert::Infallible;
+use tokio::time::{sleep, Duration};
 
 #[tokio::main]
 async fn main() {
-    // Connect to the Bitcoin Core node
-    let rpc = Arc::new(
-        Client::new(
-            "http://127.0.0.1:8332",
-            Auth::UserPass("myrpcuser".to_string(), "myrpcpassword".to_string()),
-        )
-            .unwrap(),
-    );
+    dotenv().ok();
+    env_logger::init();
 
-    // Set up PostgreSQL connection
-    let (client, _connection) = Config::new()
-        .user("postgres")
-        .password("1234")
-        .host("localhost")
-        .port(5432)
-        .dbname("bitcoin_explorer")
-        .connect(NoTls)
-        .await
-        .expect("Failed to connect to PostgreSQL.");
+    // Define the database configuration from environment variables.
+    let db_config = DatabaseConfig::from_env();
 
-    // The connection object should be run in the background.
+    // Connect to Bitcoin Core RPC.
+    let rpc = connect_to_bitcoin_rpc();
+
+    // Connect to PostgreSQL.
+    let db = connect_to_postgres(&db_config).await;
+    // Clone the database connection to pass to the server
+    let db_clone = db.clone();
+
+    let table_name = "transactions";
+
+    // Start the server in a separate task.
     tokio::spawn(async move {
-        if let Err(e) = _connection.await {
-            eprintln!("PostgreSQL connection error: {}", e);
-        }
+        server::start_server(db_clone).await;
     });
 
-    // Warp filter to get the current block height
-    let cors = cors()
-        .allow_any_origin()
-        .allow_header("content-type")
-        .allow_methods(vec!["GET", "POST"]);
+    loop {
+        process_latest_blocks(rpc.clone(), db.clone(), table_name).await;
+        sleep(Duration::from_secs(60)).await;
+    }
+}
 
-    let block_height_route = {
-        let rpc = Arc::clone(&rpc);
-        warp::path!("block_height")
-            .and(warp::get())
-            .and_then(move || {
-                let rpc = Arc::clone(&rpc);
-                async move {
-                    match rpc.get_block_count() {
-                        Ok(height) => Ok::<_, Infallible>(warp::reply::json(&height).into_response()),
-                        Err(e) => {
-                            eprintln!("Error fetching block height: {:?}", e);
-                            let err_msg = format!("Error fetching block height: {:?}", e);
-                            Ok::<_, Infallible>(warp::reply::with_status(err_msg, StatusCode::INTERNAL_SERVER_ERROR).into_response())
-                        }
-                    }
-                }
-            })
-            .with(cors)
+async fn process_latest_blocks(rpc: RpcClient, db: Arc<tokio_postgres::Client>, table_name: &str) {
+    let block_count = match get_block_count(&rpc) {
+        Ok(count) => {
+            info!("Fetched Block count: {}", count);
+            count
+        }
+        Err(e) => {
+            error!("Failed to fetch block count: {}", e);
+            return;
+        }
+    };
+    // Fetch difficulty
+    let difficulty = match get_difficulty(&rpc) {
+        Ok(diff) => diff.to_string(),
+        Err(e) => {
+            error!("Failed to fetch difficulty: {}", e);
+            return;
+        }
     };
 
-    // Spawn the loop that processes blocks and transactions in the background
-    let rpc_clone = Arc::clone(&rpc);
-    let client_ref = Arc::new(client); // Wrap the client in an Arc for shared ownership
-    tokio::spawn(async move {
-        // Get the latest block height processed
-        let latest_block_height = get_latest_block_height_from_database(&client_ref).await;
-
-        // Continuously fetch new blocks and transactions
-        loop {
-            let current_block_height = rpc_clone.get_block_count().unwrap() as i32;
-
-            // Fetch transactions for each new block
-            for block_height in (latest_block_height + 1)..=current_block_height {
-                let block_hash = rpc_clone
-                    .get_block_hash(block_height.try_into().unwrap())
-                    .unwrap();
-                let block = rpc_clone.get_block(&block_hash).unwrap();
-
-                // Process transactions in the block
-                for tx in block.txdata.iter() {
-                    // Extract transaction details and insert into PostgreSQL database
-                    process_transaction(&client_ref, tx, block_height).await;
-                }
-
-                // Update the latest processed block height in the database
-                update_latest_block_height_in_database(&client_ref, block_height).await;
-            }
-
-            // Sleep for some time before checking for new blocks again
-            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+    let connection_count = match get_connection_count(&rpc) {
+        Ok(count) => {
+            info!("Fetched connection count: {}", count);
+            count as i32
+        },
+        Err(e) => {
+            error!("Failed to fetch connection count: {}", e);
+            return;
         }
-    });
+    };
+    // Insert metrics
+    if let Err(e) = insert_metrics(&db, block_count, difficulty, connection_count).await {
+        error!("Failed to insert metrics: {}", e);
+    }
 
-    // Start the Warp server
-    warp::serve(block_height_route)
-        .run(([127, 0, 0, 1], 3030))
+    // Fetch and process the latest 10 blocks
+    for block_height in (block_count - 9)..=block_count {
+        let block_hash = match get_block_hash(&rpc, block_height) {
+            Ok(hash) => hash,
+            Err(e) => {
+                error!("Error fetching block hash: {:?}", e);
+                continue;
+            }
+        };
+
+        let block = match get_block(&rpc, &block_hash) {
+            Ok(block) => block,
+            Err(e) => {
+                error!("Error fetching block: {:?}", e);
+                continue;
+            }
+        };
+
+        // Do not need to record each transaction in the block.
+        // for tx in block.txdata.iter() {
+        //     process_transaction(&db, tx, block_height, table_name).await;
+        // }
+        insert_transaction(
+            &db,
+            &block.txdata[0].compute_txid().to_string(),
+            block_height,
+            table_name,
+        )
         .await;
-}
-
-async fn process_transaction(client: &tokio_postgres::Client, tx: &RpcTransaction, block_height: i32) {
-    // Extract transaction details and insert into PostgreSQL database
-    let txid = tx.compute_txid();
-    let fee = calculate_transaction_fee(tx).await; // Implement this function
-    insert_transaction_into_database(client, &txid.to_string(), fee, block_height).await;
-}
-
-async fn calculate_transaction_fee(tx: &RpcTransaction) -> i64 {
-    // Calculate transaction fee (dummy implementation)
-    // In a real implementation, you need to fetch the previous transactions to get the input values
-    let input_value: i64 = 0; // Replace with actual calculation
-    let output_value: i64 = tx
-        .output
-        .iter()
-        .map(|output| output.value.to_sat() as i64)
-        .sum();
-
-    input_value - output_value
-}
-
-async fn insert_transaction_into_database(client: &tokio_postgres::Client, txid: &str, fee: i64, block_height: i32) {
-    // Insert transaction details into PostgreSQL database
-    if let Err(e) = client
-        .execute(
-            "INSERT INTO transactions (txid, fee, block_height) VALUES ($1, $2, $3)",
-            &[&txid, &fee, &block_height],
-        )
-        .await
-    {
-        eprintln!("Failed to insert transaction into database: {}", e);
     }
 }
-
-async fn get_latest_block_height_from_database(client: &tokio_postgres::Client) -> i32 {
-    // Fetch and return the latest processed block height from the database
-    let row = client
-        .query_one(
-            "SELECT COALESCE(MAX(block_height), 0) FROM transactions",
-            &[],
-        )
-        .await
-        .expect("Failed to fetch latest block height from database");
-
-    row.get::<usize, i32>(0)
+async fn insert_metrics(client: &Arc<tokio_postgres::Client>, block_height: i32, difficulty: String, connection_count: i32) -> Result<(), tokio_postgres::Error> {
+    info!("Inserting metrics - Block Height: {}, Difficulty: {}, Connection count: {}", block_height, difficulty, connection_count);
+    client.execute(
+        "INSERT INTO blockchain_metrics (block_height, difficulty, connection_count) 
+         VALUES ($1, $2, $3)",
+        &[&block_height, &difficulty, &connection_count],
+    )
+    .await?;
+    Ok(())
 }
 
+#[allow(dead_code)]
+async fn process_transaction(
+    client: &Arc<tokio_postgres::Client>,
+    tx: &RpcTransaction,
 
-async fn update_latest_block_height_in_database(
-    client: &tokio_postgres::Client,
     block_height: i32,
+    table_name: &str,
 ) {
-    if let Err(e) = client
-        .execute(
-            "INSERT INTO block_heights (block_height) VALUES ($1) ON CONFLICT DO NOTHING",
-            &[&block_height],
-        )
-        .await
-    {
-        eprintln!("Failed to update latest block height in database: {}", e);
-    }
+    let txid = tx.compute_txid().to_string();
+    insert_transaction(client, &txid, block_height, table_name).await;
 }

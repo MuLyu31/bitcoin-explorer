@@ -1,0 +1,40 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=1234
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=bitcoin_explorer
+      - RUST_LOG=info
+      - USE_API=true
+    depends_on:
+      - db
+    networks:
+      - bitcoin-explorer-network
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=1234
+      - POSTGRES_DB=bitcoin_explorer
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - bitcoin-explorer-network
+
+volumes:
+  postgres_data:
+
+networks:
+  bitcoin-explorer-network:
+    external: true

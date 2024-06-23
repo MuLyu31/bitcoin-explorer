@@ -1,8 +1,17 @@
-use axum::{extract::Extension, response::Json, routing::get, Router};
+use axum::{
+    extract::Extension,
+    response::Json,
+    routing::get,
+    Router,
+    body::Body,
+};
+use http::Method;
+use http::header::CONTENT_TYPE;
 use serde::Serialize;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_postgres::Client;
+use tower_http::cors::{Any, CorsLayer};
 
 #[derive(Serialize)]
 struct Transaction {
@@ -52,14 +61,20 @@ async fn get_blockchain_metrics(
     Json(metrics)
 }
 pub async fn start_server(client: Arc<Client>) {
+    // Configure CORS
+    let cors = CorsLayer::new()
+        // Allow `GET` and `POST` when accessing the resource
+        .allow_methods([Method::GET])
+        // Allow requests from any origin
+        .allow_origin(Any);
+
     let app = Router::new()
         .route("/transactions", get(get_transactions))
         .route("/blockchain_metrics", get(get_blockchain_metrics))
-        .layer(Extension(client));
+        .layer(Extension(client))
+        .layer(cors);
 
-    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
-
-    axum::serve(listener, app.into_make_service())
-        .await
-        .unwrap();
+    let listener = TcpListener::bind("0.0.0.0:3001").await.unwrap();
+    println!("Server starting on http://localhost:3001");
+    axum::serve(listener, app).await.unwrap();
 }

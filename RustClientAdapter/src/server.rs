@@ -12,6 +12,8 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_postgres::Client;
 use tower_http::cors::{Any, CorsLayer};
+use std::error::Error;
+use log::{error, info};
 
 #[derive(Serialize)]
 struct Transaction {
@@ -60,12 +62,10 @@ async fn get_blockchain_metrics(
         .collect();
     Json(metrics)
 }
-pub async fn start_server(client: Arc<Client>) {
+pub async fn start_server(client: Arc<Client>) -> Result<(), Box<dyn Error>> {
     // Configure CORS
     let cors = CorsLayer::new()
-        // Allow `GET` and `POST` when accessing the resource
         .allow_methods([Method::GET])
-        // Allow requests from any origin
         .allow_origin(Any);
 
     let app = Router::new()
@@ -74,7 +74,17 @@ pub async fn start_server(client: Arc<Client>) {
         .layer(Extension(client))
         .layer(cors);
 
-    let listener = TcpListener::bind("0.0.0.0:3001").await.unwrap();
-    println!("Server starting on http://localhost:3001");
-    axum::serve(listener, app).await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:3001").await
+        .map_err(|e| {
+            error!("Failed to bind to address: {:?}", e);
+            e
+        })?;
+
+    info!("Server starting on http://localhost:3001");
+
+    axum::serve(listener, app).await
+        .map_err(|e| {
+            error!("Server error: {:?}", e);
+            e.into()
+        })
 }

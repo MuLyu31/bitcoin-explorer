@@ -1,5 +1,6 @@
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use std::sync::Arc;
+use log::{info, error};
 
 pub type RpcClient = Arc<Client>;
 
@@ -25,4 +26,15 @@ pub fn get_block_hash(rpc: &RpcClient, block_height: i32) -> Result<bitcoincore_
 
 pub fn get_block(rpc: &RpcClient, block_hash: &bitcoincore_rpc::bitcoin::BlockHash) -> Result<bitcoincore_rpc::bitcoin::Block, bitcoincore_rpc::Error> {
     rpc.get_block(block_hash)
+}
+
+pub fn get_difficulty(rpc: &RpcClient) -> Result<f64, bitcoincore_rpc::Error> {
+    rpc.get_difficulty()
+}
+
+pub fn get_mempool_info(rpc: &RpcClient) -> Result<bitcoincore_rpc::jsonrpc::serde_json::Value, bitcoincore_rpc::Error> {
+    rpc.call("getmempoolinfo", &[])
+}
+pub fn get_connection_count(rpc: &RpcClient) -> Result<u64, bitcoincore_rpc::Error> {
+    rpc.call("getconnectioncount", &[])
 }

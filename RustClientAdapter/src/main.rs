@@ -117,10 +117,12 @@ async fn insert_metrics(client: &Arc<tokio_postgres::Client>, block_height: i32,
     .await?;
     Ok(())
 }
+
 #[allow(dead_code)]
 async fn process_transaction(
     client: &Arc<tokio_postgres::Client>,
     tx: &RpcTransaction,
+
     block_height: i32,
     table_name: &str,
 ) {

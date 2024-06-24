@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  react-app:
+    build:
+      context: ./bitcoin-explorer-ui
+      dockerfile: Dockerfile
+      args:
+        - REACT_APP_API_URL=http://localhost:3001
+    environment:
+      - REACT_APP_API_URL=http://localhost:3001
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./RustClientAdapter
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=1234
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=bitcoin_explorer
+      - RUST_LOG=info
+      - USE_API=true
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=1234
+      - POSTGRES_DB=bitcoin_explorer
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./RustClientAdapter/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+

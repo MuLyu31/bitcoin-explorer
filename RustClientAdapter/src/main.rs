@@ -9,6 +9,7 @@ mod server;
 use config::Config;
 use data_provider::BitcoinDataProvider;
 use db::connect_to_postgres;
+use db::connect_to_postgres_with_retry;
 use dotenv::dotenv;
 use log::error;
 use std::sync::Arc;
@@ -21,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
     let config = Config::from_env();
-    let db = Arc::new(connect_to_postgres(&config.db_config).await?);
+    let db = Arc::new(connect_to_postgres_with_retry(&config.db_config).await?);
     let db_clone = db.clone();
 
     let bitcoin_provider = BitcoinDataProvider::new(config.use_api);

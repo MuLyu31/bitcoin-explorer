@@ -1,3 +1,0 @@
-[submodule "bitcoin-explorer-ui"]
-	path = bitcoin-explorer-ui
-	url = git@github.com:shihongji/bitcoin-explorer-ui.git

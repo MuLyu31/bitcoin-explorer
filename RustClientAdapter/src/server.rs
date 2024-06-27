@@ -3,10 +3,8 @@ use axum::{
     response::Json,
     routing::get,
     Router,
-    body::Body,
 };
 use http::Method;
-use http::header::CONTENT_TYPE;
 use serde::Serialize;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -25,8 +23,12 @@ struct Transaction {
 struct BlockchainMetric {
     id: i32,
     block_height: i32,
-    difficulty: f64,
-    connection_count: i32,
+    difficulty: Option<f64>,
+    connection_count: Option<i32>,
+    tx_count: Option<i32>,
+    block_size: Option<i32>,
+    block_timestamp: Option<i64>,
+    block_hash: Option<String>,
 }
 async fn get_transactions(Extension(client): Extension<Arc<Client>>) -> Json<Vec<Transaction>> {
     let rows = client
@@ -48,7 +50,7 @@ async fn get_blockchain_metrics(
     Extension(client): Extension<Arc<Client>>,
 ) -> Json<Vec<BlockchainMetric>> {
     let rows = client
-        .query("SELECT id, timestamp, block_height, difficulty::float8, connection_count FROM blockchain_metrics ORDER BY timestamp DESC LIMIT 100", &[])
+        .query("SELECT id, timestamp, block_height, difficulty::float8, connection_count, tx_count, block_size, block_timestamp, block_hash FROM blockchain_metrics ORDER BY block_height DESC LIMIT 100", &[])
         .await
         .expect("Failed to execute query");
     let metrics: Vec<BlockchainMetric> = rows
@@ -58,6 +60,10 @@ async fn get_blockchain_metrics(
             block_height: row.get("block_height"),
             difficulty: row.get("difficulty"),
             connection_count: row.get("connection_count"),
+            tx_count: row.get("tx_count"),
+            block_size: row.get("block_size"),
+            block_timestamp: row.get("block_timestamp"),
+            block_hash: row.get("block_hash"),
         })
         .collect();
     Json(metrics)

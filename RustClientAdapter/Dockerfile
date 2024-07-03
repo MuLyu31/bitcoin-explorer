@@ -1,11 +1,9 @@
-# Build stage
+# Build# Build stage
 FROM rust:1.74 as builder
-
 WORKDIR /usr/src/app
 
 # Copy over your manifests
 COPY Cargo.toml .
-
 RUN touch Cargo.lock
 
 # This is a dummy build to get the dependencies cached
@@ -27,12 +25,18 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     ca-certificates \
     libssl3 \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
 
+# Copy the built application
 COPY --from=builder /usr/src/app/target/release/rust_client_adapter .
+
+# Copy the SQL init script
+COPY ./sql/init.sql /usr/src/app/init.sql
 
 EXPOSE 3001
 
-CMD ["./rust_client_adapter"]
+# Set the startup command
+CMD ["./rust_client_adapter"]rust_client_adapter"]

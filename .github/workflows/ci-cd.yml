@@ -68,5 +68,9 @@ jobs:
           docker system prune -af || true
           docker volume prune -f || true
           docker-compose pull
+          docker-compose up -d db
+          echo "Waiting for database to initialize..."
+          sleep 90
           docker-compose up -d
+          docker image prune -af
         '

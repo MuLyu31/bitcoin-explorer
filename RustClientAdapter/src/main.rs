@@ -8,8 +8,7 @@ mod server;
 
 use config::Config;
 use data_provider::BitcoinDataProvider;
-use db::connect_to_postgres;
-use db::connect_to_postgres_with_retry;
+use db::{connect_to_postgres_with_retry, setup_database};
 use dotenv::dotenv;
 use log::error;
 use sqlx::PgPool;
@@ -18,48 +17,13 @@ use std::process::Command;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 
-async fn initialize_database(pool: &PgPool) -> Result<(), Box<dyn std::error::Error>> {
-    // First, try to create the table using sqlx
-    let result = sqlx::query(
-        "CREATE TABLE IF NOT EXISTS blockchain_metrics (
-            id SERIAL PRIMARY KEY,
-            timestamp TIMESTAMP NOT NULL,
-            difficulty DOUBLE PRECISION,
-            block_count INTEGER
-        )",
-    )
-    .execute(pool)
-    .await;
-
-    // If sqlx query fails, fall back to psql
-    if result.is_err() {
-        println!("Falling back to psql for database initialization...");
-        let output = Command::new("psql")
-            .arg(std::env::var("DATABASE_URL")?)
-            .arg("-f")
-            .arg("/usr/local/bin/init.sql")
-            .output()?;
-
-        if !output.status.success() {
-            return Err(format!(
-                "Failed to initialize database: {}",
-                String::from_utf8_lossy(&output.stderr)
-            )
-            .into());
-        }
-    }
-
-    Ok(())
-}
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     env_logger::init();
-    let pool = PgPool::connect(&std::env::var("DATABASE_URL")?).await?;
-
-    initialize_database(&pool).await?;
 
     let config = Config::from_env();
+    setup_database(&config.db_config).await?;
     let db = Arc::new(connect_to_postgres_with_retry(&config.db_config).await?);
     let db_clone = db.clone();
 

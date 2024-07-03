@@ -34,7 +34,7 @@ WORKDIR /usr/src/app
 COPY --from=builder /usr/src/app/target/release/rust_client_adapter .
 
 # Copy the SQL init script
-COPY ./sql/init.sql /usr/src/app/init.sql
+# COPY ./sql/init.sql /usr/src/app/init.sql
 
 EXPOSE 3001
 

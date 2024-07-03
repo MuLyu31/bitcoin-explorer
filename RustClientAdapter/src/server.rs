@@ -22,7 +22,7 @@ struct Transaction {
 #[derive(Serialize)]
 struct BlockchainMetric {
     id: i32,
-    block_height: i32,
+    block_height: i64,
     difficulty: Option<f64>,
     connection_count: Option<i32>,
     tx_count: Option<i32>,

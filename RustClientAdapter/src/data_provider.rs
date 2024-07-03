@@ -68,14 +68,13 @@ impl BitcoinDataProvider {
                 })
             }
             DataSource::API(api) => {
-                // Fallback implementation for API
-                // This could be replaced with actual API calls if they become available
+                let api_block_info = api.get_block_info(height).await?;
                 Ok(BlockInfo {
                     height,
-                    hash: format!("dummy_hash_for_block_{}", height),
-                    timestamp: chrono::Utc::now().timestamp(),
-                    tx_count: 0,
-                    size: 0,
+                    hash: api_block_info.hash,
+                    timestamp: api_block_info.time,
+                    tx_count: api_block_info.n_tx,
+                    size: api_block_info.size,
                 })
             }
         }

@@ -40,7 +40,6 @@ services:
       - POSTGRES_DB=bitcoin_explorer
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./RustClientAdapter/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
     healthcheck:

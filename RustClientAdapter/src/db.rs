@@ -1,7 +1,7 @@
-use tokio_postgres::{Client, NoTls};
 use crate::config::DatabaseConfig;
 use std::time::Duration;
 use tokio::time::sleep;
+use tokio_postgres::{Client, NoTls};
 
 pub async fn connect_to_postgres(config: &DatabaseConfig) -> Result<Client, tokio_postgres::Error> {
     let connection_string = format!(
@@ -17,7 +17,9 @@ pub async fn connect_to_postgres(config: &DatabaseConfig) -> Result<Client, toki
     Ok(client)
 }
 
-pub async fn connect_to_postgres_with_retry(config: &DatabaseConfig) -> Result<Client, tokio_postgres::Error> {
+pub async fn connect_to_postgres_with_retry(
+    config: &DatabaseConfig,
+) -> Result<Client, tokio_postgres::Error> {
     let mut retries = 5;
     let mut delay = Duration::from_secs(1);
 
@@ -26,14 +28,45 @@ pub async fn connect_to_postgres_with_retry(config: &DatabaseConfig) -> Result<C
             Ok(client) => return Ok(client),
             Err(e) => {
                 if retries == 0 {
-                    eprintln!("Failed to connect to database after all retries. Last error: {}", e);
+                    eprintln!(
+                        "Failed to connect to database after all retries. Last error: {}",
+                        e
+                    );
                     return Err(e);
                 }
-                eprintln!("Failed to connect to database: {}. Retrying in {:?}...", e, delay);
+                eprintln!(
+                    "Failed to connect to database: {}. Retrying in {:?}...",
+                    e, delay
+                );
                 sleep(delay).await;
                 retries -= 1;
-                delay *= 2;  // Exponential backoff
+                delay *= 2; // Exponential backoff
             }
         }
     }
+}
+
+pub async fn initialize_database(client: &Client) -> Result<(), tokio_postgres::Error> {
+    const CREATE_TABLE_SQL: &str = "
+    CREATE TABLE IF NOT EXISTS blockchain_metrics (
+        id SERIAL PRIMARY KEY,
+        timestamp TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        block_height BIGINT NOT NULL,
+        difficulty TEXT NOT NULL,
+        connection_count INTEGER,
+        tx_count INTEGER,
+        block_size INTEGER,
+        block_timestamp BIGINT,
+        block_hash TEXT
+    )";
+
+    client.execute(CREATE_TABLE_SQL, &[]).await?;
+    println!("Database initialized successfully");
+    Ok(())
+}
+
+pub async fn setup_database(config: &DatabaseConfig) -> Result<Client, Box<dyn std::error::Error>> {
+    let client = connect_to_postgres_with_retry(config).await?;
+    initialize_database(&client).await?;
+    Ok(client)
 }

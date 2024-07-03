@@ -32,6 +32,7 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         context: ./RustClientAdapter
+        file: ./RustClientAdapter/Dockerfile
         push: true
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/bitcoin-explorer-backend:latest
 

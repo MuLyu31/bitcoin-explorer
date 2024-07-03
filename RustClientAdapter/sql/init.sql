@@ -33,11 +33,6 @@ BEFORE UPDATE ON blockchain_metrics
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp();
 
--- Create a sample record (optional, remove if not needed)
-INSERT INTO blockchain_metrics (block_height, difficulty, connection_count, tx_count, block_size, block_timestamp, block_hash)
-VALUES (0, '1', 0, 0, 0, 0, 'Genesis Block Hash')
-ON CONFLICT (block_height) DO NOTHING;
-
 -- Create a function for upserting blockchain metrics
 CREATE OR REPLACE FUNCTION upsert_blockchain_metrics(
     p_block_height BIGINT,

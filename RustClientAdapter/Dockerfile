@@ -4,7 +4,9 @@ FROM rust:1.74 as builder
 WORKDIR /usr/src/app
 
 # Copy over your manifests
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml .
+
+RUN touch Cargo.lock
 
 # This is a dummy build to get the dependencies cached
 RUN mkdir src && \
@@ -13,7 +15,7 @@ RUN mkdir src && \
     rm -rf src
 
 # Now copy in your actual source code
-COPY . .
+COPY src ./src
 
 # This builds your application using the cached dependencies
 RUN cargo build --release

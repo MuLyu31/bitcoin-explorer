@@ -64,7 +64,9 @@ jobs:
       run: |
         ssh shihongji21@${{ secrets.GCP_INSTANCE_IP }} '
           cd ~
+          docker-compose down || true
+          docker system prune -af || true
+          docker volume prune -f || true
           docker-compose pull
           docker-compose up -d
-          docker image prune -af
         '

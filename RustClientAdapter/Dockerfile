@@ -15,7 +15,7 @@ RUN mkdir src && \
     rm -rf src
 
 # Now copy in your actual source code
-COPY src ./src
+COPY . .
 
 # This builds your application using the cached dependencies
 RUN cargo build --release

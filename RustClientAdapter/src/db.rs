@@ -58,13 +58,22 @@ pub async fn initialize_database(client: &Client) -> Result<(), tokio_postgres::
         block_size INTEGER,
         block_timestamp BIGINT,
         block_hash TEXT
-    )
-    -- Add a unique constraint on block_height
-    ALTER TABLE blockchain_metrics ADD CONSTRAINT unique_block_height UNIQUE (block_height);
+    );
 
-    -- Create indexes for faster queries
-    CREATE INDEX IF NOT EXISTS idx_blockchain_metrics_timestamp ON blockchain_metrics (timestamp);
-    CREATE INDEX IF NOT EXISTS idx_blockchain_metrics_block_height ON blockchain_metrics (block_height);
+    DO $$ 
+    BEGIN
+        -- Add a unique constraint on block_height if it doesn't exist
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conname = 'unique_block_height' AND conrelid = 'blockchain_metrics'::regclass
+        ) THEN
+            ALTER TABLE blockchain_metrics ADD CONSTRAINT unique_block_height UNIQUE (block_height);
+        END IF;
+
+        -- Create indexes for faster queries
+        CREATE INDEX IF NOT EXISTS idx_blockchain_metrics_timestamp ON blockchain_metrics (timestamp);
+        CREATE INDEX IF NOT EXISTS idx_blockchain_metrics_block_height ON blockchain_metrics (block_height);
+    END $$;
 
     -- Create a function to update the timestamp
     CREATE OR REPLACE FUNCTION update_timestamp()
@@ -76,6 +85,7 @@ pub async fn initialize_database(client: &Client) -> Result<(), tokio_postgres::
     $$ LANGUAGE plpgsql;
 
     -- Create a trigger to automatically update the timestamp
+    DROP TRIGGER IF EXISTS update_blockchain_metrics_timestamp ON blockchain_metrics;
     CREATE TRIGGER update_blockchain_metrics_timestamp
     BEFORE UPDATE ON blockchain_metrics
     FOR EACH ROW
@@ -107,13 +117,13 @@ pub async fn initialize_database(client: &Client) -> Result<(), tokio_postgres::
             timestamp = CURRENT_TIMESTAMP;
     END;
     $$ LANGUAGE plpgsql;
-";
+    ";
 
-    client.execute(CREATE_TABLE_SQL, &[]).await?;
+    // Execute all SQL statements
+    client.batch_execute(CREATE_TABLE_SQL).await?;
     println!("Database initialized successfully");
     Ok(())
 }
-
 pub async fn setup_database(config: &DatabaseConfig) -> Result<Client, Box<dyn std::error::Error>> {
     let client = connect_to_postgres_with_retry(config).await?;
     initialize_database(&client).await?;

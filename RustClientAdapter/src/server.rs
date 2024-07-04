@@ -4,14 +4,14 @@ use axum::{
     routing::get,
     Router,
 };
-use http::Method;
 use serde::Serialize;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_postgres::Client;
-use tower_http::cors::{Any, CorsLayer};
 use std::error::Error;
 use log::{error, info};
+use tower_http::cors::{CorsLayer, Origin};
+use http::{HeaderName, Method};
 
 #[derive(Serialize)]
 struct Transaction {
@@ -72,7 +72,10 @@ pub async fn start_server(client: Arc<Client>) -> Result<(), Box<dyn Error>> {
     // Configure CORS
     let cors = CorsLayer::new()
         .allow_methods([Method::GET])
-        .allow_origin(Any);
+        .allow_origin(Origin::exact("http://34.31.232.228".parse().unwrap()))
+        .allow_headers([HeaderName::from_static("content-type")])
+        .allow_credentials(true)
+        .expose_headers([HeaderName::from_static("content-type")]);
 
     let app = Router::new()
         .route("/transactions", get(get_transactions))

@@ -128,3 +128,6 @@ Preq: Finish section 1.1 first
 - `brew services start grafana`
 - go to  http://localhost:3000/login
 - Login with credentials (username: Admin, password is ABC123 or something you choosed)
+
+---
+Add new line here
